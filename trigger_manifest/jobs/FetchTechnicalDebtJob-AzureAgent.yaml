@@ -1,0 +1,50 @@
+# ******************************************************************
+# FetchTechnicalDebtJob-AzureAgent
+# ******************************************************************
+# TBD
+# ******************************************************************
+
+# ******************************************************************
+# Declare jobs
+# ******************************************************************
+jobs:
+        
+# ******************************************************************
+# Job: Fetch Technical Debt  
+# ******************************************************************
+# Fetch technical debt data for provided application scope 
+# ******************************************************************
+- job: fetch_tech_debt
+  displayName: Fetch Technical Debt 
+  steps:
+  - checkout: none # Avoid repository checkout
+  - download: current # Download current pipeline artifacts    
+  - template: ../tasks/InstallPythonPackage-AzureAgent.yaml # Install python package
+
+  # ******************************************************************
+  # Step: Fetch technical debt data from Architecture Dashboard
+  # ******************************************************************
+  # Fetch technical debt data for application list by leveraging 
+  # Architecture Dashboard API
+  # ******************************************************************
+
+  - script: >
+      python -m outsystems.pipeline.fetch_tech_debt
+      --artifacts "$(Artifacts.Folder)" 
+      --ad_hostname $(ArchDashboard.Hostname) 
+      --activation_code $(ArchDashboard.ActivationCode) 
+      --api_key $(ArchDashboard.APIKey)
+      --manifest_file "$(Pipeline.Workspace)/$(Manifest.Folder)/$(Manifest.File)"
+    displayName: 'Fetch technical debt data from Architecture Dashboard'
+
+  # ******************************************************************
+  # Step: Publish technical debt artifact
+  # ******************************************************************
+  # Publish manifest JSON file created in local workspace 
+  # ******************************************************************
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: "$(Artifacts.Folder)/$(ArchDashboard.Folder)"
+      ArtifactName: $(ArchDashboard.Folder)
+    condition: succeeded()
+    displayName: 'Publish technical debt artifact'

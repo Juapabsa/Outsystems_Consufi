@@ -1,0 +1,82 @@
+# ******************************************************************
+# Template: ResumeDeploymentJob-AzureAgent
+# ******************************************************************
+# TBD
+# ******************************************************************
+
+# ******************************************************************
+# Declare parameters
+# ******************************************************************
+parameters:
+- name: TargetEnvironmentLabel # Target Environment (in manifest)
+  type: string
+
+# ******************************************************************
+# Declare jobs
+# ******************************************************************
+jobs:
+
+# ******************************************************************
+# Job: Wait for confirmation 
+# ******************************************************************
+# Wait for user confirmation that prepared deployment can resume
+# ******************************************************************
+- job: wait_confirmation
+  displayName: Wait for Confirmation
+  dependsOn: lifetime_deployment
+  pool: server
+  steps:
+
+  # ******************************************************************
+  # Step: Manual user validation
+  # ******************************************************************
+  # Ask user to confirm that prepared deployment can resume    
+  # ******************************************************************
+  - task: ManualValidation@0
+    timeoutInMinutes: 1440
+    inputs:
+      instructions: 'Please confirm that prepared deployment to ${{ parameters.TargetEnvironmentLabel }} can continue.'
+      onTimeout: 'reject'
+    displayName: Manual Validation
+
+# ******************************************************************
+# Job: Resume prepared deployment 
+# ******************************************************************
+# Resume prepared deployment to target LifeTime environment after
+# manual user confirmation 
+# ******************************************************************
+- job: resume_deployment
+  displayName: Resume Deployment
+  dependsOn: wait_confirmation
+  steps:
+
+  # ******************************************************************
+  # Step: Install outsystems-pipeline python package
+  # ******************************************************************
+  # Install the outsystems-pipeline python package from PyPI repo
+  # ******************************************************************
+  - template: ../tasks/InstallPythonPackage-AzureAgent.yaml
+
+  # ******************************************************************
+  # Step: Continue prepared deployment in target environment
+  # ******************************************************************
+  # Continue prepared deployment plan in LifeTime when 2-step 
+  # deployment is enabled
+  # ******************************************************************
+  - script: >
+      python -m outsystems.pipeline.continue_deployment_to_target_env
+      --artifacts "$(Artifacts.Folder)" 
+      --lt_url $(LifeTime.Hostname) 
+      --lt_token $(LifeTimeService.AccountToken) 
+      --lt_api_version $(LifeTime.APIVersion)
+      --destination_env "${{ parameters.TargetEnvironmentLabel }}"
+    displayName: 'Continue deployment to ${{ parameters.TargetEnvironmentLabel }} environment'
+
+  # ******************************************************************
+  # Step: Apply configuration values
+  # ******************************************************************
+  # Apply configuration values (if any) to target environment
+  # ******************************************************************
+  - template: ../tasks/ApplyConfigurationValues.yaml
+    parameters:
+      TargetEnvironmentLabel: ${{ parameters.TargetEnvironmentLabel }}

@@ -1,0 +1,140 @@
+# ******************************************************************
+# Template: CD-AzureAgent
+# ******************************************************************
+# Baseline Continuous Delivery pipeline template that leverages 
+# Azure-hosted agents (i.e. each Job runs on a dedicated agent)
+# ******************************************************************
+
+# ******************************************************************
+# Declare parameters
+# ******************************************************************
+parameters:
+- name: TriggerManifest
+  displayName: Trigger Manifest
+  type: string
+- name: TriggeredBy
+  displayName: Triggered By
+  type: string
+
+# ******************************************************************
+# Declare variables
+# ******************************************************************
+variables:
+  - group: OutSystems-Template-SharedVars
+
+# ******************************************************************
+# Declare triggers
+# ******************************************************************
+trigger: none
+pr: none
+
+# ******************************************************************
+# Declare agent type
+# ******************************************************************
+pool:
+  vmImage: $(Agent.VMImage)
+
+# ******************************************************************
+# Declare stages
+# ******************************************************************
+stages:
+
+# ******************************************************************
+# Stage: Setup
+# ******************************************************************
+- stage: setup
+  displayName: Setup  
+  jobs:
+
+  # ******************************************************************
+  # Job: Publish Trigger Manifest
+  # ******************************************************************
+  # Publish trigger manifest artifact provided as input
+  # ******************************************************************
+  - template: ./jobs/PublishTriggerManifest-AzureAgent.yaml
+    parameters:
+      TriggerManifest: ${{ parameters.TriggerManifest }}
+
+# # ******************************************************************
+# # Stage: Code Analysis
+# # ******************************************************************
+# - stage: code_analysis
+#   displayName: Code Analysis    
+#   jobs:
+
+#   # ******************************************************************
+#   # Job: Fetch Technical Debt
+#   # ******************************************************************
+#   # Fetch technical debt data from Architecture Dashboard 
+#   # ******************************************************************
+#   - template: ./jobs/FetchTechnicalDebtJob-AzureAgent.yaml
+
+#   # ******************************************************************
+#   # Job: Validate Technical Debt
+#   # ******************************************************************
+#   # Validate technical debt data using predefined thresholds
+#   # ******************************************************************
+#   # Sample script to validate TechDebt level and number of 
+#   # security findings
+#   - template: ./jobs/ValidateTechnicalDebtJob-AzureAgent.yaml 
+
+# # ******************************************************************
+# # Stage: Regression Testing
+# # ******************************************************************
+# - stage: regression_testing
+#   displayName: Regression Testing
+#   jobs:
+
+#   # ******************************************************************
+#   # Job: Regression Testing (BDD)
+#   # ******************************************************************
+#   # Run BDD regression tests and publish test results
+#   # ******************************************************************
+#   - template: ./jobs/RegressionTestingJob-AzureAgent.yaml
+#     parameters:
+#       BDDTestJobs: $(BDDTestJobs)
+
+# ******************************************************************
+# Stage: Quality Assurance
+# ******************************************************************
+- stage: quality_assurance
+  displayName: Quality Assurance
+  jobs:
+
+  # ******************************************************************
+  # Job: LifeTime Deployment
+  # ******************************************************************
+  # Deploy list of application versions to ACC environment
+  # ******************************************************************
+  - template: ./jobs/LifeTimeDeploymentJob-AzureAgent.yaml
+    parameters:
+      EnvironmentKey: $(Environment.Quality.Key)
+      SourceEnvironmentLabel: $(Environment.Development.Label)
+      DestinationEnvironmentLabel: $(Environment.Quality.Label)
+
+  # ******************************************************************
+  # Job: Accept Changes
+  # ******************************************************************
+  # Accept release candidate before go-live
+  # ******************************************************************
+  - template: ./jobs/AcceptChangesJob-AzureAgent.yaml
+
+# ******************************************************************
+# Stage: Go-Live
+# ******************************************************************
+- stage: go_live
+  displayName: Go-Live
+  jobs:
+
+  # ******************************************************************
+  # Job: LifeTime Deployment
+  # ******************************************************************
+  # Deploy list of application versions to PRD environment
+  # ******************************************************************
+  - template: ./jobs/LifeTimeDeploymentJob-AzureAgent.yaml
+    parameters:
+      EnvironmentKey: $(Environment.Production.Key)
+      SourceEnvironmentLabel: $(Environment.Quality.Label)
+      DestinationEnvironmentLabel: $(Environment.Production.Label)
+    # To enable 2stage-deploy on this environment uncomment the line below 
+    #  Use2StepDeployment: true

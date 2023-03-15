@@ -1,0 +1,58 @@
+# ******************************************************************
+# Template: RegressionTestingJob-AzureAgent
+# ******************************************************************
+# TBD
+# ******************************************************************
+
+# ******************************************************************
+# Declare parameters
+# ******************************************************************
+parameters:
+- name: BDDTestJobs # BDD test jobs to run (comma-separated list)
+  type: string
+
+# ******************************************************************
+# Declare jobs
+# ******************************************************************
+jobs:
+
+# ******************************************************************
+# Job: BDD Regression Testing 
+# ******************************************************************
+# Run list of BDD test jobs and publish results to the pipeline 
+# ******************************************************************
+- job: regression_testing_bdd
+  displayName: Regression Testing (BDD)
+  dependsOn: lifetime_deployment
+  steps:
+  - checkout: none # Avoid repository checkout
+
+  # ******************************************************************
+  # Step: Run BDD test jobs 
+  # ******************************************************************
+  # Run a comma-separated list of BDD test jobs using the BDD Test
+  # Manager REST API, and store the results in junit format files (one 
+  # per test job) 
+  #
+  # NOTE: API calls timeout set to 5 mins (300 secs)
+  # ******************************************************************
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: ("${{ parameters.BDDTestJobs }}").Split(",") | ForEach { Invoke-RestMethod -Uri "$(BDDTestManager.APIBaseURL)/rest/v1/TriggerTestRun?JobKey=$_&Env=$(BDDTestManager.TargetEnvironment)" -TimeoutSec 300 -OutFile "junit-bdd.$_.xml"}
+    displayName: 'Run BDD test jobs'
+
+  # ******************************************************************
+  # Step: Publish aggregated test results
+  # ******************************************************************
+  # Publish aggregated results for all JUnit test result files
+  # ******************************************************************
+  - task: PublishTestResults@2
+    inputs:
+      testRunTitle: 'BDD Tests'
+      testResultsFormat: 'JUnit'
+      testResultsFiles: 'junit-bdd.*.xml' 
+      searchFolder: '$(System.DefaultWorkingDirectory)'
+      mergeTestResults: true
+      failTaskOnFailedTests: true    
+    displayName: 'Publish test results'
